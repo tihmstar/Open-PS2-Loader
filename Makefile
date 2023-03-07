@@ -275,7 +275,7 @@ clean:
 	echo " -in-game SMAP"
 	$(MAKE) -C modules/network/smap-ingame clean
 	echo " -UDPBD SMAP"
-	$(MAKE) -C modules/smap_udpbd/smap_udpbd.irx clean
+	$(MAKE) -C modules/smap_udpbd/ clean
 	echo " -smbinit"
 	$(MAKE) -C modules/network/smbinit clean
 	echo " -nbns"
