@@ -81,7 +81,9 @@ EECORE_OBJS = ee_core.o ioprp.o util.o \
 		udnl.o imgdrv.o eesync.o \
 		bdm_cdvdman.o IOPRP_img.o smb_cdvdman.o \
 		hdd_cdvdman.o hdd_hdpro_cdvdman.o cdvdfsv.o \
-		ingame_smstcpip.o smap_ingame.o smbman.o smbinit.o
+		ingame_smstcpip.o smap_ingame.o smbman.o smbinit.o \
+		smap_udpbd.o
+
 
 PNG_ASSETS = load0 load1 load2 load3 load4 load5 load6 load7 usb usb_bd ilk_bd \
 	m4s_bd hdd eth app cross triangle circle square select start left right up down \
@@ -272,6 +274,8 @@ clean:
 	$(MAKE) -C modules/network/SMSTCPIP clean
 	echo " -in-game SMAP"
 	$(MAKE) -C modules/network/smap-ingame clean
+	echo " -UDPBD SMAP"
+	$(MAKE) -C modules/smap_udpbd/smap_udpbd.irx clean
 	echo " -smbinit"
 	$(MAKE) -C modules/network/smbinit clean
 	echo " -nbns"
@@ -359,6 +363,12 @@ ee_core/ee_core.elf: ee_core
 
 $(EE_ASM_DIR)ee_core.s: ee_core/ee_core.elf | $(EE_ASM_DIR)
 	$(BIN2S) $< $@ eecore_elf
+
+modules/smap_udpbd/smap_udpbd.irx: modules/smap_udpbd/
+	$(MAKE) -C $<
+
+$(EE_ASM_DIR)smap_udpbd.s: modules/smap_udpbd/smap_udpbd.irx | $(EE_ASM_DIR)
+	$(BIN2S) $< $@ smap_udpbd_irx
 
 $(EE_ASM_DIR)udnl.s: $(UDNL_OUT) | $(EE_ASM_DIR)
 	$(BIN2S) $(UDNL_OUT) $@ udnl_irx

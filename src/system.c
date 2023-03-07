@@ -358,6 +358,7 @@ void sysExecExit(void)
 #define CORE_IRX_DECI2  0x40
 #define CORE_IRX_ILINK  0x80
 #define CORE_IRX_MX4SIO 0x100
+#define CORE_IRX_UDPBD  0x200
 
 typedef struct
 {
@@ -439,6 +440,8 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         modules |= CORE_IRX_ILINK;
     else if (!strcmp(mode_str, "BDM_M4S_MODE"))
         modules |= CORE_IRX_MX4SIO;
+    else if (!strcmp(mode_str, "BDM_UDP_MODE"))
+        modules |= CORE_IRX_UDPBD;
     else if (!strcmp(mode_str, "ETH_MODE"))
         modules |= CORE_IRX_ETH | CORE_IRX_SMB;
     else
@@ -486,6 +489,10 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
         irxptr_tab[modcount].info = size_mx4sio_bd_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_MX4SIOBD);
         irxptr_tab[modcount++].ptr = (void *)&mx4sio_bd_irx;
     }
+    if (modules & CORE_IRX_UDPBD) {
+        irxptr_tab[modcount].info = size_smap_udpbd_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SMAP);
+        irxptr_tab[modcount++].ptr = (void *)&smap_udpbd_irx;
+    }
     if (modules & CORE_IRX_ETH) {
         irxptr_tab[modcount].info = size_smap_ingame_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_SMAP);
         irxptr_tab[modcount++].ptr = (void *)&smap_ingame_irx;
@@ -524,8 +531,8 @@ static unsigned int sendIrxKernelRAM(const char *startup, const char *mode_str, 
     }
 #else
     if (modules & CORE_IRX_DEBUG) {
-        irxptr_tab[modcount].info = size_udptty_ingame_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_UDPTTY);
-        irxptr_tab[modcount++].ptr = (void *)&udptty_ingame_irx;
+        //irxptr_tab[modcount].info = size_udptty_ingame_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_UDPTTY);
+        //irxptr_tab[modcount++].ptr = (void *)&udptty_ingame_irx;
         irxptr_tab[modcount].info = size_ioptrap_irx | SET_OPL_MOD_ID(OPL_MODULE_ID_IOPTRAP);
         irxptr_tab[modcount++].ptr = (void *)&ioptrap_irx;
     }

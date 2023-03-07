@@ -1,5 +1,5 @@
 IOP_OBJS = cdvdman.o ioops.o ncmd.o scmd.o searchfile.o streaming.o ioplib_util.o smsutils.o imports.o exports.o ../../isofs/zso.o ../../isofs/lz4.o
-USE_DEV9 ?= 0
+USE_DEV9 ?= 1
 
 ifeq ($(USE_HDD),1)
 IOP_BIN  = hdd_cdvdman.irx

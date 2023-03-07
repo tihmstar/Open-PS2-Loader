@@ -29,9 +29,9 @@ int debugSetActive(void)
     if (ret < 0)
         return -9;
 #else
-    ret = sysLoadModuleBuffer(&udptty_irx, size_udptty_irx, 0, NULL);
-    if (ret < 0)
-        return -8;
+    //ret = sysLoadModuleBuffer(&udptty_irx, size_udptty_irx, 0, NULL);
+    //if (ret < 0)
+    //    return -8;
 
     ret = sysLoadModuleBuffer(&ioptrap_irx, size_ioptrap_irx, 0, NULL);
     if (ret < 0)

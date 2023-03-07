@@ -140,7 +140,7 @@ static int loadISOGameListCache(const char *path, struct game_cache_list *cache)
                     result = EIO;
                 }
             } else {
-                LOG("loadISOGameListCache: failed to allocate memory.\n");
+                LOG("loadISOGameListCache: failed to allocate memory for %d size.\n", size);
                 result = ENOMEM;
             }
         } else {

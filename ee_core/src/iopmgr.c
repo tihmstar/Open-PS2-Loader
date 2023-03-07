@@ -102,7 +102,7 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
     LoadOPLModule(OPL_MODULE_ID_DRVTIF, 0, 0, NULL);
     LoadOPLModule(OPL_MODULE_ID_TIFINET, 0, 0, NULL);
 #else
-    LoadOPLModule(OPL_MODULE_ID_UDPTTY, 0, 0, NULL);
+    //LoadOPLModule(OPL_MODULE_ID_UDPTTY, 0, 0, NULL);
     LoadOPLModule(OPL_MODULE_ID_IOPTRAP, 0, 0, NULL);
 #endif
 #endif
@@ -136,6 +136,10 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
         case BDM_M4S_MODE:
             LoadOPLModule(OPL_MODULE_ID_MX4SIOBD, 0, 0, NULL);
             break;
+        case BDM_UDP_MODE:
+            LoadOPLModule(OPL_MODULE_ID_SMAP, 0, 0, NULL);
+            break;
+
     };
 }
 
