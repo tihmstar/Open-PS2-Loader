@@ -18,6 +18,8 @@
 #define M_DEBUG(format, args...)
 #endif
 
+#define UINT32_MAX (4294967295U)
+
 #define UDPBD_MAX_RETRIES         4
 
 
@@ -82,7 +84,7 @@ static unsigned int _udpbd_timeout(void *arg)
 //
 // Block device interface
 //
-static int _udpbd_read(struct block_device *bd, uint32_t sector, void *buffer, uint16_t count)
+static int _udpbd_read(struct block_device *bd, uint64_t sector, void *buffer, uint16_t count)
 {
     uint32_t EFBits;
     iop_sys_clock_t clock;
@@ -150,7 +152,7 @@ static int _udpbd_read(struct block_device *bd, uint32_t sector, void *buffer, u
     return -EIO;
 }
 
-static int udpbd_read(struct block_device *bd, uint32_t sector, void *buffer, uint16_t count)
+static int udpbd_read(struct block_device *bd, uint64_t sector, void *buffer, uint16_t count)
 {
     int retries;
     uint16_t count_left = count;
@@ -187,11 +189,19 @@ static int udpbd_read(struct block_device *bd, uint32_t sector, void *buffer, ui
     return count;
 }
 
-static int udpbd_write(struct block_device *bd, uint32_t sector, const void *buffer, uint16_t count)
+static int udpbd_write(struct block_device *bd, uint64_t sector, const void *buffer, uint16_t count)
 {
     uint32_t EFBits;
 
     M_DEBUG("%s: sector=%d, count=%d\n", __func__, sector, count);
+
+    if (sector > UINT32_MAX) {
+        // server expects u32 sector, disconnect to avoid potential data corruption
+        M_DEBUG("%s: write past u32, disconnecting\n", __func__);
+        bdm_disconnect_bd(&g_udpbd);
+        bdm_connected = 0;
+        return -EIO;
+    }
 
     g_cmdid = (g_cmdid + 1) & 0x7;
 
