@@ -19,8 +19,12 @@
 
 #include "main.h"
 #include "xfer.h"
+#ifndef NO_UDPBD
 #include "udpbd.h"
+#endif
+#ifndef NO_TTY
 #include "udptty.h"
+#endif
 int udpbd_init(void);
 
 /*  There is a difference in how the transmissions are made,
@@ -406,9 +410,12 @@ static void IntrHandlerThread(struct SmapDriverData *SmapDrivPrivData)
                 SMAP_EMAC3_SET32(SMAP_R_EMAC3_MODE0, SMAP_E3_TXMAC_ENABLE | SMAP_E3_RXMAC_ENABLE);
                 DelayThread(10000);
                 SmapDrivPrivData->SmapIsInitialized = 1;
-
+#ifndef NO_UDPBD
                 udpbd_init();
+#endif
+#ifndef NO_TTY
                 udptty_init();
+#endif
 
                 if (!SmapDrivPrivData->EnableLinkCheckTimer) {
                     USec2SysClock(1000000, &SmapDrivPrivData->LinkCheckTimer);

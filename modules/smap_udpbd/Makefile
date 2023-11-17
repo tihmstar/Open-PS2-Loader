@@ -1,5 +1,5 @@
 IOP_CFLAGS += -mno-check-zero-division
-IOP_OBJS = main.o smap.o xfer.o ministack.o udpbd.o udptty.o imports.o exports.o
+IOP_OBJS = main.o smap.o xfer.o ministack.o imports.o exports.o
 HAS_BDM ?= 1
 IOP_BIN = smap_udpbd.irx
 BIN2C = $(PS2SDK)/bin/bin2c
@@ -15,6 +15,18 @@ endif
 
 ifeq ($(DEBUG),1)
   IOP_CFLAGS += -DDEBUG
+endif
+
+ifeq ($(NO_UDPBD),1)
+  IOP_CFLAGS += -DNO_UDPBD
+else
+  IOP_OBJS += udpbd.o
+endif
+
+ifeq ($(NO_TTY),1)
+  IOP_CFLAGS += -DNO_TTY
+else
+  IOP_OBJS += udptty.o
 endif
 
 all: $(IOP_BIN)
