@@ -5,7 +5,7 @@
 #include "xfer.h"
 
 static uint32_t ip_addr = IP_ADDR(192, 168, 66, 82);
-static const uint8_t dst_mac_addr[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+static const uint8_t dst_mac_addr[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff}; // XXX THIS NEEDS TO BE REPLACED WITH REAL DST MAC, OTHERWISE IT DOESN'T WORK!!!
 
 typedef struct {
     uint8_t  mac[6];
