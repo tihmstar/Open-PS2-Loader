@@ -7,6 +7,8 @@
 
 #define UDPBD_PORT            0xBDBD //The port on which to listen for incoming data
 
+#define UDPBD_SERVER          IP_ADDR(192,168,67,60)
+
 #define UDPBD_CMD_INFO        0x00 // client -> server
 #define UDPBD_CMD_INFO_REPLY  0x01 // server -> client
 #define UDPBD_CMD_READ        0x02 // client -> server

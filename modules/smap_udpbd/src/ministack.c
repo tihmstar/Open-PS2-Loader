@@ -1,10 +1,11 @@
 #include <smapregs.h>
 #include <stdio.h>
+#include <string.h>
 #include "ministack.h"
 #include "xfer.h"
 
-
-static uint32_t ip_addr = IP_ADDR(192, 168, 1, 10);
+static uint32_t ip_addr = IP_ADDR(192, 168, 66, 82);
+static const uint8_t dst_mac_addr[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 typedef struct {
     uint8_t  mac[6];
@@ -16,13 +17,7 @@ arp_entry_t arp_table[MS_ARP_ENTRIES];
 
 void eth_packet_init(eth_packet_t *pkt, uint16_t type)
 {
-    // Ethernet, broadcast
-    pkt->eth.addr_dst[0] = 0xff;
-    pkt->eth.addr_dst[1] = 0xff;
-    pkt->eth.addr_dst[2] = 0xff;
-    pkt->eth.addr_dst[3] = 0xff;
-    pkt->eth.addr_dst[4] = 0xff;
-    pkt->eth.addr_dst[5] = 0xff;
+    memcpy(pkt->eth.addr_dst,dst_mac_addr, sizeof(pkt->eth.addr_dst));
     SMAPGetMACAddress(pkt->eth.addr_src);
     pkt->eth.type = htons(type);
 }

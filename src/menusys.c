@@ -76,6 +76,7 @@ static submenu_list_t *appMenu;
 static submenu_list_t *appMenuCurrent;
 
 static s32 menuSemaId;
+static s32 menuListSemaId = -1;
 static ee_sema_t menuSema;
 
 static void menuRenameGame(submenu_list_t **submenu)
@@ -99,8 +100,13 @@ static void menuRenameGame(submenu_list_t **submenu)
                 if (guiShowKeyboard(newName, nameLength)) {
                     guiSwitchScreen(GUI_SCREEN_MAIN);
                     submenuDestroy(submenu);
-                    support->itemRename(selected_item->item->current->item.id, newName);
-                    ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
+
+                    // Only rename the file if the name changed; trying to rename a file with a file name that hasn't changed can cause the file
+                    // to be deleted on certain file systems.
+                    if (strcmp(newName, selected_item->item->current->item.text) != 0) {
+                        support->itemRename(selected_item->item->current->item.id, newName);
+                        ioPutRequest(IO_MENU_UPDATE_DEFFERED, &support->mode);
+                    }
                 }
             }
         }
@@ -287,6 +293,9 @@ void menuInit()
     menuSema.max_count = 1;
     menuSema.option = 0;
     menuSemaId = CreateSema(&menuSema);
+    if (menuListSemaId < 0) {
+        menuListSemaId = sbCreateSemaphore();
+    }
 }
 
 void menuEnd()
@@ -298,8 +307,8 @@ void menuEnd()
         menu_list_t *td = cur;
         cur = cur->next;
 
-        if (&td->item)
-            submenuDestroy(&td->item->submenu);
+        if (td->item)
+            submenuDestroy(&(td->item->submenu));
 
         menuRemoveHints(td->item);
 
@@ -316,6 +325,8 @@ void menuEnd()
     }
 
     DeleteSema(menuSemaId);
+    DeleteSema(menuListSemaId);
+    menuListSemaId = -1;
 }
 
 static menu_list_t *AllocMenuItem(menu_item_t *item)
@@ -335,24 +346,27 @@ void menuAppendItem(menu_item_t *item)
 {
     assert(item);
 
+    WaitSema(menuListSemaId);
+
     if (menu == NULL) {
         menu = AllocMenuItem(item);
         selected_item = menu;
-        return;
+    } else {
+        menu_list_t *cur = menu;
+
+        // traverse till the end
+        while (cur->next)
+            cur = cur->next;
+
+        // create new item
+        menu_list_t *newitem = AllocMenuItem(item);
+
+        // link
+        cur->next = newitem;
+        newitem->prev = cur;
     }
 
-    menu_list_t *cur = menu;
-
-    // traverse till the end
-    while (cur->next)
-        cur = cur->next;
-
-    // create new item
-    menu_list_t *newitem = AllocMenuItem(item);
-
-    // link
-    cur->next = newitem;
-    newitem->prev = cur;
+    SignalSema(menuListSemaId);
 }
 
 void submenuRebuildCache(submenu_list_t *submenu)
