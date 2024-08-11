@@ -225,19 +225,27 @@ static inline int udp_packet_send(udp_socket_t *socket, udp_packet_t *pkt, uint1
 void ms_ip_set_ip(uint32_t ip);
 
 /**
- * Get the IP address
+ * Get the local IP address
  * @return IP addres
  */
 uint32_t ms_ip_get_ip();
 
+/**
+ * Set the Router IP address
+ * @param ip IP addres
+ */
+void ms_router_set_ip(uint32_t ip);
+
+/**
+ * Get the Router IP address
+ * @return IP addres
+ */
+uint32_t ms_router_get_ip();
 
 
 
-int arp_add_entry(uint32_t ip, uint8_t mac[6]);
 int handle_rx_eth(uint16_t pointer);
-
-
-
+int arp_request_entry(uint32_t ip, uint8_t mac[6]); //request if not cached
 
 
 

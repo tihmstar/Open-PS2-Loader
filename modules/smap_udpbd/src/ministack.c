@@ -1,23 +1,38 @@
 #include <smapregs.h>
+#include <thevent.h>
 #include <stdio.h>
 #include <string.h>
 #include "ministack.h"
 #include "xfer.h"
 
-static uint32_t ip_addr = IP_ADDR(192, 168, 66, 82);
-static const uint8_t dst_mac_addr[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff}; // XXX THIS NEEDS TO BE REPLACED WITH REAL DST MAC, OTHERWISE IT DOESN'T WORK!!!
+static uint32_t ip_addr = IP_ADDR(192, 168, 0, 10);
+static uint32_t router_addr = IP_ADDR(192, 168, 0, 1);
+static int g_arp_event = 0;
+#define ARP_RESOLUTION_SUCCESS (1<<0)
+#define ARP_RESOLUTION_TIMEOUT (1<<1)
 
 typedef struct {
     uint8_t  mac[6];
     uint32_t ip;
 } arp_entry_t;
 #define MS_ARP_ENTRIES 8
-arp_entry_t arp_table[MS_ARP_ENTRIES];
+static arp_entry_t arp_table[MS_ARP_ENTRIES];
+static int arp_last_overwrite_entry = 0;
+
+//private functions
+int arp_add_entry(uint32_t ip, uint8_t mac[6]); //local cache
+int arp_get_entry(uint32_t ip, uint8_t mac[6]); //local cache
+void arp_send_request_for_ip(uint32_t ip);
 
 
 void eth_packet_init(eth_packet_t *pkt, uint16_t type)
 {
-    memcpy(pkt->eth.addr_dst,dst_mac_addr, sizeof(pkt->eth.addr_dst));
+    pkt->eth.addr_dst[0] = 0xff;
+    pkt->eth.addr_dst[1] = 0xff;
+    pkt->eth.addr_dst[2] = 0xff;
+    pkt->eth.addr_dst[3] = 0xff;
+    pkt->eth.addr_dst[4] = 0xff;
+    pkt->eth.addr_dst[5] = 0xff;
     SMAPGetMACAddress(pkt->eth.addr_src);
     pkt->eth.type = htons(type);
 }
@@ -25,6 +40,7 @@ void eth_packet_init(eth_packet_t *pkt, uint16_t type)
 void ip_packet_init(ip_packet_t *pkt, uint32_t ip_dest)
 {
     eth_packet_init((eth_packet_t *)pkt, ETH_TYPE_IPV4);
+    arp_request_entry(ip_dest, pkt->eth.addr_dst);
 
     // IP, broadcast
     pkt->ip.hlen             = 0x45;
@@ -128,20 +144,36 @@ int arp_add_entry(uint32_t ip, uint8_t mac[6])
         }
     }
 
-    // Add new entry
+    {
+      arp_last_overwrite_entry = (arp_last_overwrite_entry + 1) % (sizeof(arp_table)/sizeof(*arp_table));
+      i = arp_last_overwrite_entry;
+
+      arp_table[i].ip  = ip;
+      arp_table[i].mac[0] = mac[0];
+      arp_table[i].mac[1] = mac[1];
+      arp_table[i].mac[2] = mac[2];
+      arp_table[i].mac[3] = mac[3];
+      arp_table[i].mac[4] = mac[4];
+      arp_table[i].mac[5] = mac[5];
+      return 0;
+    }
+
+    return -1;
+}
+
+int arp_get_entry(uint32_t ip, uint8_t mac[6]){
+    int i;
     for (i=0; i<MS_ARP_ENTRIES; i++) {
-        if (ip == 0) {
-            arp_table[i].ip  = ip;
-            arp_table[i].mac[0] = mac[0];
-            arp_table[i].mac[1] = mac[1];
-            arp_table[i].mac[2] = mac[2];
-            arp_table[i].mac[3] = mac[3];
-            arp_table[i].mac[4] = mac[4];
-            arp_table[i].mac[5] = mac[5];
+        if (ip == arp_table[i].ip) {
+            mac[0] = arp_table[i].mac[0];
+            mac[1] = arp_table[i].mac[1];
+            mac[2] = arp_table[i].mac[2];
+            mac[3] = arp_table[i].mac[3];
+            mac[4] = arp_table[i].mac[4];
+            mac[5] = arp_table[i].mac[5];
             return 0;
         }
     }
-
     return -1;
 }
 
@@ -186,6 +218,9 @@ static inline int handle_rx_arp(uint16_t pointer)
         reply.arp.target_mac[5] = req.arp.sender_mac[5];
         reply.arp.target_ip     = req.arp.sender_ip;
         smap_transmit(&reply, 0x2A, NULL, 0);
+    }else if (ntohs(req.arp.oper) == 2 && ntohl(req.arp.target_ip) == ip_addr){
+        arp_add_entry(ntohl(req.arp.sender_ip), req.arp.sender_mac);
+        SetEventFlag(g_arp_event, ARP_RESOLUTION_SUCCESS);
     }
 
     return -1;
@@ -248,12 +283,98 @@ int handle_rx_eth(uint16_t pointer)
     }
 }
 
-void ms_ip_set_ip(uint32_t ip)
-{
-    ip_addr = ip;
+void arp_send_request_for_ip(uint32_t ip){
+    arp_packet_t pkt;
+    eth_packet_init((eth_packet_t*)&pkt.eth, ETH_TYPE_ARP);
+    pkt.arp.htype = htons(1); //ethernet
+    pkt.arp.ptype = htons(ETH_TYPE_IPV4);
+    pkt.arp.hlen = 6;
+    pkt.arp.plen = 4;
+    pkt.arp.oper = htons(1); // request
+    SMAPGetMACAddress(pkt.arp.sender_mac);
+    pkt.arp.sender_ip = htonl(ip_addr);
+    bzero(pkt.arp.target_mac, sizeof(pkt.arp.target_mac));
+    pkt.arp.target_ip = htonl(ip);
+    eth_packet_send_ll((eth_packet_t*)&pkt, sizeof(pkt.arp), NULL, 0);
 }
 
-uint32_t ms_ip_get_ip()
-{
-    return ip_addr;
+static unsigned int _arp_timeout(void *arg){
+  iSetEventFlag(g_arp_event, ARP_RESOLUTION_TIMEOUT);
+  return 0;
+}
+
+int arp_request_entry(uint32_t ip, uint8_t mac[6]){
+  //is it already cached maybe?
+  if (!arp_get_entry(ip, mac)) return 0;
+  //no arp entry found!
+  iop_sys_clock_t clock;
+
+  if (g_arp_event <= 0){
+    //create event if it doesn't already exist
+    iop_event_t EventFlagData;
+    EventFlagData.attr   = 0;
+    EventFlagData.option = 0;
+    EventFlagData.bits   = 0;
+    g_arp_event = CreateEventFlag(&EventFlagData);
+  }
+
+  arp_send_request_for_ip(ip);
+
+  // Set alarm in case we don't get an ARP response
+  /*
+    FIXME: This timer seems to be much much longer than it should be
+           But if i lower it to something reasonable like 200ms, it times out *before* `arp_send_request_for_ip` gets out on the wire
+           What is going on here???
+  */
+  USec2SysClock(2000 * 1000, &clock);
+  SetAlarm(&clock, _arp_timeout, NULL);
+
+  // wait for data...
+  {
+    uint32_t EFBits;
+    while (!WaitEventFlag(g_arp_event, ARP_RESOLUTION_TIMEOUT | ARP_RESOLUTION_SUCCESS, WEF_OR | WEF_CLEAR, &EFBits)){
+      if (EFBits & ARP_RESOLUTION_TIMEOUT) break;
+      if (!arp_get_entry(ip, mac)){
+        CancelAlarm(_arp_timeout, NULL);
+        return 0;
+      }
+    }
+  }
+
+  CancelAlarm(_arp_timeout, NULL);
+
+  //do we have a cache now?
+  if (!arp_get_entry(ip, mac)) return 0;
+  if (ip != router_addr){
+    /*
+      Requested IP wasn't found and we didn't request the router.
+      This means we need to route the trafic through the router, so let's do that
+    */
+    if (!arp_request_entry(router_addr, mac)){
+      //router arp request was successfull, let's cache it for the current IP
+      arp_add_entry(ip, mac);
+      return 0;
+    }
+  }
+  return -1;
+}
+
+void ms_ip_set_ip(uint32_t ip){
+  ip_addr = ip;
+}
+
+uint32_t ms_ip_get_ip(){
+  return ip_addr;
+}
+
+void ms_router_set_ip(uint32_t ip){
+  router_addr = ip;
+  {
+    uint8_t routermac[6];
+    arp_request_entry(router_addr, routermac);
+  }
+}
+
+uint32_t ms_router_get_ip(){
+    return router_addr;
 }

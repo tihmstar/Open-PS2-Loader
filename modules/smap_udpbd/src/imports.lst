@@ -21,6 +21,7 @@ stdio_IMPORTS_end
 
 sysclib_IMPORTS_start
 I_memcpy
+I_memset
 I_bzero
 sysclib_IMPORTS_end
 

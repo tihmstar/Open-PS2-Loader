@@ -410,12 +410,6 @@ static void IntrHandlerThread(struct SmapDriverData *SmapDrivPrivData)
                 SMAP_EMAC3_SET32(SMAP_R_EMAC3_MODE0, SMAP_E3_TXMAC_ENABLE | SMAP_E3_RXMAC_ENABLE);
                 DelayThread(10000);
                 SmapDrivPrivData->SmapIsInitialized = 1;
-#ifndef NO_UDPBD
-                udpbd_init();
-#endif
-#ifndef NO_TTY
-                udptty_init();
-#endif
 
                 if (!SmapDrivPrivData->EnableLinkCheckTimer) {
                     USec2SysClock(1000000, &SmapDrivPrivData->LinkCheckTimer);
@@ -618,7 +612,16 @@ int smap_init(int argc, char *argv[])
 
     xfer_init();
 
-    return SetupNetDev();
+    int ret = SetupNetDev();
+
+#ifndef NO_UDPBD
+    udpbd_init();
+#endif
+#ifndef NO_TTY
+    udptty_init();
+#endif
+
+    return ret;
 }
 
 int SMAPGetMACAddress(u8 *buffer)

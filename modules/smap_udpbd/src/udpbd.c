@@ -10,6 +10,11 @@
 #include "ministack.h"
 #include "main.h"
 
+#define UDPBD_SERVER          IP_ADDR(192,168,67,60)
+
+#define PS2_IP_ADDR           IP_ADDR(192,168,66,82)
+#define ROUTER_IP_ADDR        IP_ADDR(192,168,66,1)
+
 #ifdef DEBUG
 #define M_PRINTF(format, args...) printf("UDPBD: " format, ##args)
 #define M_DEBUG(format, args...)  printf("UDPBD: " format, ##args)
@@ -427,6 +432,9 @@ int udpbd_init(void)
     g_udpbd.write        = udpbd_write;
     g_udpbd.flush        = udpbd_flush;
     g_udpbd.stop         = udpbd_stop;
+
+    ms_ip_set_ip(PS2_IP_ADDR);
+    ms_router_set_ip(ROUTER_IP_ADDR);
 
     // Bind to UDP socket
     udpbd_socket = udp_bind(UDPBD_PORT, udpbd_isr, NULL);
