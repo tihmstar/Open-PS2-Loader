@@ -134,7 +134,7 @@ static void ResetIopSpecial(const char *args, unsigned int arglen)
             LoadOPLModule(OPL_MODULE_ID_MX4SIOBD, 0, 0, NULL);
             break;
         case BDM_UDP_MODE:
-            LoadOPLModule(OPL_MODULE_ID_SMAP, 0, 0, NULL);
+            LoadOPLModule(OPL_MODULE_ID_SMAP, 0, g_ipconfig_len, g_ipconfig);
             break;
 
     };

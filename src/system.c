@@ -790,7 +790,13 @@ void sysLaunchLoaderElf(const char *filename, const char *mode_str, int size_cdv
     void *eeloadCopy, *initUserMemory;
     struct GsmConfig_t gsm_config;
 
-    ethGetNetConfig(local_ip_address, local_netmask, local_gateway);
+    if (ethGetNetConfig(local_ip_address, local_netmask, local_gateway) < 0){
+      for (int i=0; i<4; i++){
+        local_ip_address[i] = ps2_ip[i];
+        local_netmask[i] = ps2_netmask[i];
+        local_gateway[i] = ps2_gateway[i];
+      }
+    }
 #if (!defined(__DEBUG) && !defined(_DTL_T10000))
     AddHistoryRecordUsingFullPath(filename);
 #endif

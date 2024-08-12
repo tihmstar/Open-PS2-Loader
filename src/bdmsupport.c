@@ -127,7 +127,7 @@ static void bdmLoadBlockDeviceModules(void)
                   "%03d.%03d.%03d.%03dX"
                   "%03d.%03d.%03d.%03dX",
                   ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3],
-                  ps2_dns[0], ps2_dns[1], ps2_dns[2], ps2_dns[3], //this is actually the UDPBD server!
+                  ps2_netmask[0], ps2_netmask[1], ps2_netmask[2], ps2_netmask[3], //this is actually the UDPBD server!
                   ps2_gateway[0], ps2_gateway[1], ps2_gateway[2], ps2_gateway[3]
                   );
           for (int i=0; i<sizeof(argsnetconfig); i++){
