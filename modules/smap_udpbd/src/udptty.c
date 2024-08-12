@@ -7,6 +7,7 @@ static int tty_sema   = -1;
 static char ttyname[] = "tty";
 static udp_packet_t pkt;
 
+static uint32_t gServerIP = 0;
 
 static int dummy_m5() { return -5; }
 static int dummy_0()  { return 0; }
@@ -22,7 +23,7 @@ static int ttyInit(iop_device_t *driver)
         return -1;
 
     // Broadcast packet to UDPTTY port
-    udp_packet_init(&pkt, IP_ADDR(255,255,255,255), 18194);
+    udp_packet_init(&pkt, gServerIP, 18194);
 
     // We send the header and text separately
     // This saves IOP RAM (~1K), and also saves a memcpy
@@ -72,8 +73,7 @@ iop_device_t tty_driver = {
     "TTY via Udp",
     &tty_functarray};
 
-int udptty_init()
-{
+int udptty_init(uint32_t serverIP){
     close(0);
     close(1);
     DelDrv(ttyname);

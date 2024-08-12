@@ -10,11 +10,6 @@
 #include "ministack.h"
 #include "main.h"
 
-#define UDPBD_SERVER          IP_ADDR(192,168,67,60)
-
-#define PS2_IP_ADDR           IP_ADDR(192,168,66,82)
-#define ROUTER_IP_ADDR        IP_ADDR(192,168,66,1)
-
 #ifdef DEBUG
 #define M_PRINTF(format, args...) printf("UDPBD: " format, ##args)
 #define M_DEBUG(format, args...)  printf("UDPBD: " format, ##args)
@@ -77,6 +72,7 @@ static unsigned int g_read_size;
 static int32_t g_errno = 0;
 static udp_socket_t *udpbd_socket = NULL;
 
+static uint32_t gUDPBDServerIP = 0;
 
 static unsigned int _udpbd_timeout(void *arg)
 {
@@ -103,7 +99,7 @@ static int _udpbd_read(struct block_device *bd, uint64_t sector, void *buffer, u
     g_read_size     = count * g_udpbd.sectorSize;
     g_read_cmdpkt   = 1; // First reply packet should be cmdpkt==1
 
-    udp_packet_init((udp_packet_t *)&pkt, UDPBD_SERVER, UDPBD_PORT);
+    udp_packet_init((udp_packet_t *)&pkt, gUDPBDServerIP, UDPBD_PORT);
     pkt.rw.hdr.cmd    = UDPBD_CMD_READ;
     pkt.rw.hdr.cmdid  = g_cmdid;
     pkt.rw.hdr.cmdpkt = 0;
@@ -213,7 +209,7 @@ static int udpbd_write(struct block_device *bd, uint64_t sector, const void *buf
     // Send write command
     {
         udpbd_pkt_rw_t pkt;
-        udp_packet_init((udp_packet_t *)&pkt, UDPBD_SERVER, UDPBD_PORT);
+        udp_packet_init((udp_packet_t *)&pkt, gUDPBDServerIP, UDPBD_PORT);
         pkt.rw.hdr.cmd    = UDPBD_CMD_WRITE;
         pkt.rw.hdr.cmdid  = g_cmdid;
         pkt.rw.hdr.cmdpkt = 0;
@@ -230,7 +226,7 @@ static int udpbd_write(struct block_device *bd, uint64_t sector, const void *buf
     {
         uint16_t count_left = count;
         udpbd_pkt_rdma_t pkt;
-        udp_packet_init((udp_packet_t *)&pkt, UDPBD_SERVER, UDPBD_PORT);
+        udp_packet_init((udp_packet_t *)&pkt, gUDPBDServerIP, UDPBD_PORT);
         pkt.hdr.cmd    = UDPBD_CMD_WRITE_RDMA;
         pkt.hdr.cmdid  = g_cmdid;
         pkt.hdr.cmdpkt = 0;
@@ -410,7 +406,7 @@ static int udpbd_isr(udp_socket_t *socket, uint16_t pointer, void *arg)
 //
 // Public functions
 //
-int udpbd_init(void)
+int udpbd_init(uint32_t myIp, uint32_t routerIP, uint32_t serverIP)
 {
     udpbd_pkt_t pkt;
     iop_event_t EventFlagData;
@@ -433,14 +429,15 @@ int udpbd_init(void)
     g_udpbd.flush        = udpbd_flush;
     g_udpbd.stop         = udpbd_stop;
 
-    ms_ip_set_ip(PS2_IP_ADDR);
-    ms_router_set_ip(ROUTER_IP_ADDR);
+    gUDPBDServerIP = serverIP;
+    ms_ip_set_ip(myIp);
+    ms_router_set_ip(routerIP);
 
     // Bind to UDP socket
     udpbd_socket = udp_bind(UDPBD_PORT, udpbd_isr, NULL);
 
     // Broadcast request for block device information
-    udp_packet_init((udp_packet_t *)&pkt, UDPBD_SERVER, UDPBD_PORT);
+    udp_packet_init((udp_packet_t *)&pkt, gUDPBDServerIP, UDPBD_PORT);
     pkt.bd.cmd    = UDPBD_CMD_INFO;
     pkt.bd.cmdid  = g_cmdid;
     pkt.bd.cmdpkt = 0;

@@ -1,6 +1,8 @@
 #ifndef TTY_H
 #define TTY_H
 
-int udptty_init();
+#include <stdint.h>
+
+int udptty_init(uint32_t serverIP);
 
 #endif

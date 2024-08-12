@@ -19,13 +19,6 @@
 
 #include "main.h"
 #include "xfer.h"
-#ifndef NO_UDPBD
-#include "udpbd.h"
-#endif
-#ifndef NO_TTY
-#include "udptty.h"
-#endif
-int udpbd_init(void);
 
 /*  There is a difference in how the transmissions are made,
     between this driver and the SONY original.
@@ -612,16 +605,7 @@ int smap_init(int argc, char *argv[])
 
     xfer_init();
 
-    int ret = SetupNetDev();
-
-#ifndef NO_UDPBD
-    udpbd_init();
-#endif
-#ifndef NO_TTY
-    udptty_init();
-#endif
-
-    return ret;
+    return SetupNetDev();
 }
 
 int SMAPGetMACAddress(u8 *buffer)

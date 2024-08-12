@@ -113,9 +113,30 @@ static void bdmLoadBlockDeviceModules(void)
 
     static int udpbdModLoaded = 0;
     if (dev9ModLoaded && !udpbdModLoaded) {
-        LOG("Loading UDPBD\n");
-        sysLoadModuleBuffer(&smap_udpbd_irx, size_smap_udpbd_irx, 0, NULL);
-        udpbdModLoaded = 1;
+        static int udpbdModShouldWaitBeforeLoading = 1;
+        if (udpbdModShouldWaitBeforeLoading-- == 0){
+          /*
+            Load me only on the second call, wtf??
+            Dunno exactly why this works, but basically we want to load the network config before we load the udpbd module,
+            otherwise ps2_ip, ps2_dns and ps2_gateway are not initialized yet
+          */
+          LOG("Loading UDPBD\n");
+          char argsnetconfig[4*4*3];
+          snprintf(argsnetconfig, sizeof(argsnetconfig),
+                  "%03d.%03d.%03d.%03dX"
+                  "%03d.%03d.%03d.%03dX"
+                  "%03d.%03d.%03d.%03dX",
+                  ps2_ip[0], ps2_ip[1], ps2_ip[2], ps2_ip[3],
+                  ps2_dns[0], ps2_dns[1], ps2_dns[2], ps2_dns[3], //this is actually the UDPBD server!
+                  ps2_gateway[0], ps2_gateway[1], ps2_gateway[2], ps2_gateway[3]
+                  );
+          for (int i=0; i<sizeof(argsnetconfig); i++){
+            if (argsnetconfig[i] == 'X')
+              argsnetconfig[i] = '\0';
+          }
+          sysLoadModuleBuffer(&smap_udpbd_irx, size_smap_udpbd_irx, sizeof(argsnetconfig), argsnetconfig);
+          udpbdModLoaded = 1;
+        }
     }
     SignalSema(bdmLoadModuleLock);
 }
