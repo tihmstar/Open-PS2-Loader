@@ -326,7 +326,7 @@ int arp_request_entry(uint32_t ip, uint8_t mac[6]){
            But if i lower it to something reasonable like 200ms, it times out *before* `arp_send_request_for_ip` gets out on the wire
            What is going on here???
   */
-  USec2SysClock(2000 * 1000, &clock);
+  USec2SysClock(3000 * 1000, &clock);
   SetAlarm(&clock, _arp_timeout, NULL);
 
   // wait for data...
