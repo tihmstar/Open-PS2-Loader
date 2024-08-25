@@ -429,6 +429,8 @@ int udpbd_init(uint32_t myIp, uint32_t routerIP, uint32_t serverIP)
     g_udpbd.flush        = udpbd_flush;
     g_udpbd.stop         = udpbd_stop;
 
+    ministack_init();
+
     gUDPBDServerIP = serverIP;
     ms_ip_set_ip(myIp);
     ms_router_set_ip(routerIP);

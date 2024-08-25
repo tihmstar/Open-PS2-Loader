@@ -1,5 +1,6 @@
 #include <smapregs.h>
 #include <thevent.h>
+#include <thsemap.h>
 #include <stdio.h>
 #include <string.h>
 #include "ministack.h"
@@ -18,6 +19,8 @@ typedef struct {
 #define MS_ARP_ENTRIES 8
 static arp_entry_t arp_table[MS_ARP_ENTRIES];
 static int arp_last_overwrite_entry = 0;
+static int gSema_ARP_Req = -1;
+static int gSema_ARP_Cache = -1;
 
 //private functions
 int arp_add_entry(uint32_t ip, uint8_t mac[6]); //local cache
@@ -27,12 +30,15 @@ void arp_send_request_for_ip(uint32_t ip);
 
 void eth_packet_init(eth_packet_t *pkt, uint16_t type)
 {
-    pkt->eth.addr_dst[0] = 0xff;
-    pkt->eth.addr_dst[1] = 0xff;
-    pkt->eth.addr_dst[2] = 0xff;
-    pkt->eth.addr_dst[3] = 0xff;
-    pkt->eth.addr_dst[4] = 0xff;
-    pkt->eth.addr_dst[5] = 0xff;
+#ifdef DEBUG
+    //41:42:43:44:45:46 should never go out on the wire!!
+    pkt->eth.addr_dst[0] = 0x41;
+    pkt->eth.addr_dst[1] = 0x42;
+    pkt->eth.addr_dst[2] = 0x43;
+    pkt->eth.addr_dst[3] = 0x44;
+    pkt->eth.addr_dst[4] = 0x45;
+    pkt->eth.addr_dst[5] = 0x46;
+#endif
     SMAPGetMACAddress(pkt->eth.addr_src);
     pkt->eth.type = htons(type);
 }
@@ -129,7 +135,10 @@ int udp_packet_send_ll(udp_socket_t *socket, udp_packet_t *pkt, uint16_t pktdata
 
 int arp_add_entry(uint32_t ip, uint8_t mac[6])
 {
-    int i;
+    int err = -1;
+    int i = 0;
+
+    WaitSema(gSema_ARP_Cache);
 
     // Update existing entry
     for (i=0; i<MS_ARP_ENTRIES; i++) {
@@ -140,7 +149,8 @@ int arp_add_entry(uint32_t ip, uint8_t mac[6])
             arp_table[i].mac[3] = mac[3];
             arp_table[i].mac[4] = mac[4];
             arp_table[i].mac[5] = mac[5];
-            return 0;
+            err = 0;
+            goto out;
         }
     }
 
@@ -155,14 +165,19 @@ int arp_add_entry(uint32_t ip, uint8_t mac[6])
       arp_table[i].mac[3] = mac[3];
       arp_table[i].mac[4] = mac[4];
       arp_table[i].mac[5] = mac[5];
-      return 0;
+      err = 0;
+      goto out;
     }
 
-    return -1;
+out:
+    SignalSema(gSema_ARP_Cache);
+    return err;
 }
 
 int arp_get_entry(uint32_t ip, uint8_t mac[6]){
+    int err = -1;
     int i;
+    WaitSema(gSema_ARP_Cache);
     for (i=0; i<MS_ARP_ENTRIES; i++) {
         if (ip == arp_table[i].ip) {
             mac[0] = arp_table[i].mac[0];
@@ -171,10 +186,13 @@ int arp_get_entry(uint32_t ip, uint8_t mac[6]){
             mac[3] = arp_table[i].mac[3];
             mac[4] = arp_table[i].mac[4];
             mac[5] = arp_table[i].mac[5];
-            return 0;
+            err = 0;
+            goto out;
         }
     }
-    return -1;
+out:
+    SignalSema(gSema_ARP_Cache);
+    return err;
 }
 
 static inline int handle_rx_arp(uint16_t pointer)
@@ -292,6 +310,12 @@ void arp_send_request_for_ip(uint32_t ip){
     pkt.arp.plen = 4;
     pkt.arp.oper = htons(1); // request
     SMAPGetMACAddress(pkt.arp.sender_mac);
+    pkt.eth.addr_dst[0] = 0xFF;
+    pkt.eth.addr_dst[1] = 0xFF;
+    pkt.eth.addr_dst[2] = 0xFF;
+    pkt.eth.addr_dst[3] = 0xFF;
+    pkt.eth.addr_dst[4] = 0xFF;
+    pkt.eth.addr_dst[5] = 0xFF;
     pkt.arp.sender_ip = htonl(ip_addr);
     bzero(pkt.arp.target_mac, sizeof(pkt.arp.target_mac));
     pkt.arp.target_ip = htonl(ip);
@@ -307,41 +331,39 @@ int arp_request_entry(uint32_t ip, uint8_t mac[6]){
   //is it already cached maybe?
   if (!arp_get_entry(ip, mac)) return 0;
   //no arp entry found!
-  iop_sys_clock_t clock;
 
-  if (g_arp_event <= 0){
-    //create event if it doesn't already exist
-    iop_event_t EventFlagData;
-    EventFlagData.attr   = 0;
-    EventFlagData.option = 0;
-    EventFlagData.bits   = 0;
-    g_arp_event = CreateEventFlag(&EventFlagData);
-  }
-
-  arp_send_request_for_ip(ip);
-
-  // Set alarm in case we don't get an ARP response
-  /*
-    FIXME: This timer seems to be much much longer than it should be
-           But if i lower it to something reasonable like 200ms, it times out *before* `arp_send_request_for_ip` gets out on the wire
-           What is going on here???
-  */
-  USec2SysClock(3000 * 1000, &clock);
-  SetAlarm(&clock, _arp_timeout, NULL);
-
-  // wait for data...
   {
-    uint32_t EFBits;
-    while (!WaitEventFlag(g_arp_event, ARP_RESOLUTION_TIMEOUT | ARP_RESOLUTION_SUCCESS, WEF_OR | WEF_CLEAR, &EFBits)){
-      if (EFBits & ARP_RESOLUTION_TIMEOUT) break;
-      if (!arp_get_entry(ip, mac)){
-        CancelAlarm(_arp_timeout, NULL);
-        return 0;
-      }
+    WaitSema(gSema_ARP_Req);
+    //while we were waiting for mutex, was there an entry maybe?
+    if (!arp_get_entry(ip, mac)){
+      SignalSema(gSema_ARP_Req);
+      return 0;
     }
-  }
 
-  CancelAlarm(_arp_timeout, NULL);
+    iop_sys_clock_t clock;
+    arp_send_request_for_ip(ip);
+
+    // Set alarm in case we don't get an ARP response
+    /*
+      FIXME: This timer seems to be much much longer than it should be
+            But if i lower it to something reasonable like 200ms, it times out *before* `arp_send_request_for_ip` gets out on the wire
+            What is going on here???
+    */
+    USec2SysClock(5000 * 1000, &clock);
+    SetAlarm(&clock, _arp_timeout, NULL);
+
+    // wait for data...
+    {
+      uint32_t EFBits;
+      while (!WaitEventFlag(g_arp_event, ARP_RESOLUTION_TIMEOUT | ARP_RESOLUTION_SUCCESS, WEF_OR | WEF_CLEAR, &EFBits)){
+        if (EFBits & ARP_RESOLUTION_TIMEOUT) break;
+        if (!arp_get_entry(ip, mac)) break;
+      }
+      CancelAlarm(_arp_timeout, NULL);
+    }
+
+    SignalSema(gSema_ARP_Req);
+  }
 
   //do we have a cache now?
   if (!arp_get_entry(ip, mac)) return 0;
@@ -355,6 +377,11 @@ int arp_request_entry(uint32_t ip, uint8_t mac[6]){
       arp_add_entry(ip, mac);
       return 0;
     }
+  }else{
+    //we failed to resolve mac for router, fallback to broadcast
+    uint8_t broadcase_mac[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+    arp_add_entry(ip, broadcase_mac);
+    arp_get_entry(ip, mac);
   }
   return -1;
 }
@@ -369,12 +396,22 @@ uint32_t ms_ip_get_ip(){
 
 void ms_router_set_ip(uint32_t ip){
   router_addr = ip;
-  {
-    uint8_t routermac[6];
-    arp_request_entry(router_addr, routermac);
-  }
 }
 
 uint32_t ms_router_get_ip(){
     return router_addr;
+}
+
+int ministack_init(){
+  iop_event_t EventFlagData;
+  EventFlagData.attr   = 0;
+  EventFlagData.option = 0;
+  EventFlagData.bits   = 0;
+  g_arp_event = CreateEventFlag(&EventFlagData);
+
+  gSema_ARP_Req = CreateMutex(IOP_MUTEX_UNLOCKED);
+  gSema_ARP_Cache = CreateMutex(IOP_MUTEX_UNLOCKED);
+
+  bzero(arp_table,sizeof(arp_table));
+  return 0;
 }

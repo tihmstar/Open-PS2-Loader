@@ -247,6 +247,6 @@ uint32_t ms_router_get_ip();
 int handle_rx_eth(uint16_t pointer);
 int arp_request_entry(uint32_t ip, uint8_t mac[6]); //request if not cached
 
-
+int ministack_init();
 
 #endif
